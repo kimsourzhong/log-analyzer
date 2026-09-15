@@ -593,4 +593,3 @@ else:
     st.info(
         "Upload a log file or check the sample box above to get started."
     )
-```
