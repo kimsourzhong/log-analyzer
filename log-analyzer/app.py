@@ -257,8 +257,8 @@ def normalize_message(message: str) -> str:
 
 header_html = (
     f'<div style="display:flex;'
-    f'align-items:center;'
-    f'gap:11px;'
+    f'align-items:baseline;'
+    f'gap:10px;'
     f'margin-bottom:2px;">'
     f'{icon("logs", 26, ACCENT)}'
     f'<span style="font-size:1.6rem;'
@@ -266,6 +266,11 @@ header_html = (
     f'color:{INK};'
     f'letter-spacing:-0.01em;">'
     f'Log Analyzer'
+    f'</span>'
+    f'<span style="font-size:0.78rem;'
+    f'font-weight:400;'
+    f'color:#9AA3A8;">'
+    f'Developed by Kimsour Zhong'
     f'</span>'
     f'</div>'
 )
