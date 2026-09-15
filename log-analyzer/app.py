@@ -1,4 +1,3 @@
-```python
 """
 Log Analyzer — a simple support tool that parses application log files,
 groups issues by pattern, and surfaces the most frequent problems.
