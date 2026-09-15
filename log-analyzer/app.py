@@ -21,8 +21,8 @@ import streamlit as st
 # FILE PATHS
 # ============================================================
 
-# Always resolve files relative to this app.py file.
-# This is important when deploying to Streamlit Community Cloud.
+# Always resolve files relative to app.py.
+# This makes the app work correctly on Streamlit Community Cloud.
 BASE_DIR = Path(__file__).resolve().parent
 
 SAMPLE_LOG_PATH = BASE_DIR / "sample_log.txt"
@@ -33,13 +33,16 @@ ICON_PATH = BASE_DIR / "assets" / "icon.png"
 # PAGE CONFIGURATION
 # ============================================================
 
-# Use the icon only if it actually exists.
-# This prevents the app from crashing if the icon is missing.
-page_icon = str(ICON_PATH) if ICON_PATH.exists() else "📊"
+# Use the custom icon if it exists.
+# Otherwise use a normal emoji so the app does not crash.
+if ICON_PATH.exists():
+    PAGE_ICON = str(ICON_PATH)
+else:
+    PAGE_ICON = "📊"
 
 st.set_page_config(
     page_title="Log Analyzer",
-    page_icon=page_icon,
+    page_icon=PAGE_ICON,
     layout="wide",
 )
 
@@ -94,37 +97,47 @@ def icon(name: str, size: int = 20, color: str = ACCENT) -> str:
     return paths.get(name, "")
 
 
+# ============================================================
+# SECTION HEADER
+# ============================================================
+
 def section_header(
     icon_name: str,
     text: str,
-    subtitle: str | None = None,
+    subtitle=None,
 ):
-    subtitle_html = (
-        f'<div style="color:{MUTED};font-size:0.86rem;margin-bottom:8px;">'
-        f"{subtitle}</div>"
-        if subtitle
-        else '<div style="margin-bottom:6px;"></div>'
+    if subtitle:
+        subtitle_html = (
+            f'<div style="color:{MUTED};'
+            f'font-size:0.86rem;'
+            f'margin-bottom:8px;">'
+            f'{subtitle}'
+            f'</div>'
+        )
+    else:
+        subtitle_html = (
+            '<div style="margin-bottom:6px;"></div>'
+        )
+
+    # Keep the HTML flush-left inside the Python string.
+    # This prevents Streamlit from interpreting it as a code block.
+    html = (
+        f'<div style="display:flex;'
+        f'align-items:center;'
+        f'gap:9px;'
+        f'margin:6px 0 2px 0;">'
+        f'{icon(icon_name, 19, ACCENT)}'
+        f'<span style="font-size:1.05rem;'
+        f'font-weight:600;'
+        f'color:{INK};">'
+        f'{text}'
+        f'</span>'
+        f'</div>'
+        f'{subtitle_html}'
     )
 
     st.markdown(
-        f"""
-        <div style="
-            display:flex;
-            align-items:center;
-            gap:9px;
-            margin:6px 0 2px 0;
-        ">
-            {icon(icon_name, 19, ACCENT)}
-            <span style="
-                font-size:1.05rem;
-                font-weight:600;
-                color:{INK};
-            ">
-                {text}
-            </span>
-        </div>
-        {subtitle_html}
-        """,
+        html,
         unsafe_allow_html=True,
     )
 
@@ -135,25 +148,25 @@ def section_header(
 
 st.markdown(
     f"""
-    <style>
-        hr {{
-            border-color: {BORDER} !important;
-        }}
+<style>
+    hr {{
+        border-color: {BORDER} !important;
+    }}
 
-        [data-testid="stMetricValue"] {{
-            color: {INK};
-        }}
+    [data-testid="stMetricValue"] {{
+        color: {INK};
+    }}
 
-        [data-testid="stMetricLabel"] {{
-            color: {MUTED};
-        }}
+    [data-testid="stMetricLabel"] {{
+        color: {MUTED};
+    }}
 
-        .stDataFrame {{
-            border: 1px solid {BORDER};
-            border-radius: 4px;
-        }}
-    </style>
-    """,
+    .stDataFrame {{
+        border: 1px solid {BORDER};
+        border-radius: 4px;
+    }}
+</style>
+""",
     unsafe_allow_html=True,
 )
 
@@ -163,7 +176,8 @@ st.markdown(
 # ============================================================
 
 LOG_PATTERN = re.compile(
-    r"^(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s+"
+    r"^(?P<timestamp>\d{4}-\d{2}-\d{2} "
+    r"\d{2}:\d{2}:\d{2})\s+"
     r"\[(?P<level>\w+)\]\s+"
     r"\((?P<component>[\w\-]+)\)\s+"
     r"region=(?P<region>[\w\-]+)\s+-\s+"
@@ -172,17 +186,10 @@ LOG_PATTERN = re.compile(
 
 
 def parse_log(text: str) -> pd.DataFrame:
-    """
-    Parse log text into a pandas DataFrame.
-
-    Expected format:
-
-    2026-01-01 12:00:00 [ERROR] (api) region=us-east - Something failed
-    """
-
     rows = []
 
     for line in text.splitlines():
+
         line = line.strip()
 
         if not line:
@@ -191,6 +198,7 @@ def parse_log(text: str) -> pd.DataFrame:
         match = LOG_PATTERN.match(line)
 
         if match:
+
             data = match.groupdict()
 
             try:
@@ -198,13 +206,15 @@ def parse_log(text: str) -> pd.DataFrame:
                     data["timestamp"],
                     "%Y-%m-%d %H:%M:%S",
                 )
+
             except ValueError:
                 data["timestamp"] = None
 
             rows.append(data)
 
         else:
-            # Keep unparsed lines so that no information silently disappears.
+
+            # Keep unparsed lines so no information is silently lost.
             rows.append(
                 {
                     "timestamp": None,
@@ -220,8 +230,7 @@ def parse_log(text: str) -> pd.DataFrame:
 
 def normalize_message(message: str) -> str:
     """
-    Group similar messages together by removing obvious
-    variable values such as numbers and IDs.
+    Groups similar messages together by replacing numbers.
 
     Example:
 
@@ -233,42 +242,43 @@ def normalize_message(message: str) -> str:
         Timeout after #s
     """
 
-    normalized = re.sub(r"\d+", "#", message)
+    normalized = re.sub(
+        r"\d+",
+        "#",
+        message,
+    )
 
     return normalized.strip()
 
 
 # ============================================================
-# HEADER
+# APPLICATION HEADER
 # ============================================================
 
-st.markdown(
-    f"""
-    <div style="
-        display:flex;
-        align-items:center;
-        gap:11px;
-        margin-bottom:2px;
-    ">
-        {icon("logs", 26, ACCENT)}
+header_html = (
+    f'<div style="display:flex;'
+    f'align-items:center;'
+    f'gap:11px;'
+    f'margin-bottom:2px;">'
+    f'{icon("logs", 26, ACCENT)}'
+    f'<span style="font-size:1.6rem;'
+    f'font-weight:650;'
+    f'color:{INK};'
+    f'letter-spacing:-0.01em;">'
+    f'Log Analyzer'
+    f'</span>'
+    f'</div>'
+)
 
-        <span style="
-            font-size:1.6rem;
-            font-weight:650;
-            color:{INK};
-            letter-spacing:-0.01em;
-        ">
-            Log Analyzer
-        </span>
-    </div>
-    """,
+st.markdown(
+    header_html,
     unsafe_allow_html=True,
 )
 
 st.caption(
-    "Upload an application log file to see error patterns, frequency, "
-    "and which regions and components are affected — a lightweight "
-    "version of production log monitoring."
+    "Upload an application log file to see error patterns, "
+    "frequency, and which regions and components are affected "
+    "— a lightweight version of production log monitoring."
 )
 
 
@@ -285,6 +295,7 @@ uploaded = st.file_uploader(
 use_sample = False
 
 if not uploaded:
+
     use_sample = st.checkbox(
         "No file? Use the bundled sample log instead",
         value=True,
@@ -296,6 +307,7 @@ if not uploaded:
 # ============================================================
 
 log_text = None
+
 
 # ------------------------------------------------------------
 # Uploaded file
@@ -315,44 +327,34 @@ if uploaded:
 
 elif use_sample:
 
-    # IMPORTANT:
-    # Do NOT use:
-    #
-    #     open("sample_log.txt")
-    #
-    # because Streamlit Cloud may use a different
-    # working directory.
-    #
-    # Instead, explicitly use the directory containing app.py.
-
     try:
 
-        if not SAMPLE_LOG_PATH.exists():
-
-            st.error(
-                "The bundled sample_log.txt file could not be found."
-            )
-
-            st.code(
-                f"Expected file location:\n{SAMPLE_LOG_PATH}"
-            )
-
-            st.info(
-                "Make sure sample_log.txt is committed to the same "
-                "GitHub folder as app.py."
-            )
-
-        else:
+        if SAMPLE_LOG_PATH.exists():
 
             log_text = SAMPLE_LOG_PATH.read_text(
                 encoding="utf-8",
                 errors="ignore",
             )
 
-    except Exception as e:
+        else:
+
+            st.error(
+                "The bundled sample_log.txt file could not be found."
+            )
+
+            st.code(
+                f"Expected location:\n{SAMPLE_LOG_PATH}"
+            )
+
+            st.info(
+                "Make sure sample_log.txt is committed to the "
+                "same GitHub folder as app.py."
+            )
+
+    except Exception as error:
 
         st.error(
-            f"Could not load sample_log.txt: {e}"
+            f"Could not load sample_log.txt: {error}"
         )
 
 
@@ -377,7 +379,7 @@ if log_text:
     else:
 
         # ====================================================
-        # METRICS
+        # TOP METRICS
         # ====================================================
 
         total = len(df)
@@ -395,20 +397,24 @@ if log_text:
 
         c1, c2, c3, c4 = st.columns(4)
 
+
         c1.metric(
             "Total log lines",
             total,
         )
+
 
         c2.metric(
             "Errors / Critical",
             len(errors),
         )
 
+
         c3.metric(
             "Warnings",
             len(warnings),
         )
+
 
         c4.metric(
             "Error rate",
@@ -478,7 +484,8 @@ if log_text:
             else:
 
                 st.info(
-                    "No errors found — nothing to break down by region."
+                    "No errors found — nothing to "
+                    "break down by region."
                 )
 
 
@@ -493,9 +500,10 @@ if log_text:
             "alert",
             "Most frequent issues",
             (
-                "Similar messages (e.g. varying timeouts or IDs) "
-                "are grouped together, mirroring how a support "
-                "engineer would triage recurring known issues."
+                "Similar messages (e.g. varying timeouts "
+                "or IDs) are grouped together, mirroring "
+                "how a support engineer would triage "
+                "recurring known issues."
             ),
         )
 
@@ -513,7 +521,10 @@ if log_text:
             pattern_counts = (
                 errors
                 .groupby(
-                    ["pattern", "component"]
+                    [
+                        "pattern",
+                        "component",
+                    ]
                 )
                 .size()
                 .reset_index(
@@ -526,12 +537,14 @@ if log_text:
             )
 
 
-            display_data = pattern_counts.rename(
-                columns={
-                    "pattern": "Issue pattern",
-                    "component": "Component",
-                    "count": "Occurrences",
-                }
+            display_data = (
+                pattern_counts.rename(
+                    columns={
+                        "pattern": "Issue pattern",
+                        "component": "Component",
+                        "count": "Occurrences",
+                    }
+                )
             )
 
 
@@ -545,7 +558,8 @@ if log_text:
         else:
 
             st.info(
-                "No errors or critical issues detected in this log."
+                "No errors or critical issues "
+                "detected in this log."
             )
 
 
@@ -571,9 +585,11 @@ if log_text:
         # CSV EXPORT
         # ====================================================
 
-        csv = df.to_csv(
-            index=False
-        ).encode("utf-8")
+        csv = (
+            df
+            .to_csv(index=False)
+            .encode("utf-8")
+        )
 
 
         st.download_button(
@@ -591,5 +607,6 @@ if log_text:
 else:
 
     st.info(
-        "Upload a log file or check the sample box above to get started."
+        "Upload a log file or check the sample box "
+        "above to get started."
     )
